@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+telegram:
+  bot:
+    token:
+    username:
+
+spring:
+  main:
+    web-application-type: none
+  ai:
+    openai:
+      api-key:
+      chat:
+        options:
+          model: gpt-4o-mini
+
+google:
+  sheets:
+    spreadsheet-id:
+    credentials-path: credentials.json
+    sheet-name: Words
+
