@@ -5,21 +5,20 @@ import com.example.TelegramWordsBot.model.WordData;
 import com.example.TelegramWordsBot.repository.InMemoryUserSessionRepository;
 import com.example.TelegramWordsBot.service.ChatGPTService;
 import com.example.TelegramWordsBot.service.GoogleSheetsService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.TelegramWordsBot.util.ResourceUtils;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendAnimation;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 @Component
@@ -44,58 +43,31 @@ public class TelegramBot extends TelegramLongPollingBot {
             long chatId = update.getMessage().getChatId();
 
             if (messageText.equals("/start")) {
-                sendMessage(chatId, "Привет! Отправь мне список английских слов, и я помогу создать словарь.");
+                sendGifWithText(chatId, "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif", "start_message.html");
             } else if (messageText.equals("/sheet_id")) {
                 memoryUserSession.setState(chatId, UserState.WAITING_FOR_SHEET_ID);
-                sendGifWithText(
-                        chatId,
-                        "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif",
-                        """
-                        📄 Отправь ID Google Sheets таблицы.
-                
-                        Как получить ID:
-                        1. Открой Google Sheets
-                        2. Посмотри на URL:
-                           https://docs.google.com/spreadsheets/d/SHEET_ID/edit
-                        3. Скопируй часть между /d/ и /edit
-                        4. Отправь её сюда следующим сообщением
-                        """
-                );
+                sendGifWithText(chatId, "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif", "sheet_id_message.html");
             } else if (memoryUserSession.getState(chatId) == UserState.WAITING_FOR_SHEET_ID) {
-                setSheetId(messageText, chatId);
+                setSheetId(chatId, messageText);
             } else {
-                try {
-                    sendMessage(chatId, "Обрабатываю слова...");
-                    List<WordData> wordsData = chatGPTService.processWords(messageText);
-                    
-                    try {
-                        googleSheetsService.writeWords(chatId, wordsData);
-                        sendMessage(chatId, "✅ Данные успешно записаны в Google Sheets!");
-                    } catch (Exception e) {
-                        sendMessage(chatId, "⚠️ Ошибка при записи в Google Sheets: " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                } catch (Exception e) {
-                    sendMessage(chatId, "Ошибка при обработке слов: " + e.getMessage());
-                    e.printStackTrace();
-                }
+                processAndSaveWords(chatId, messageText);
             }
         }
     }
 
-    private void sendMessage(long chatId, String text) {
+    private Message sendMessage(long chatId, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(text);
 
         try {
-            execute(message);
+           return execute(message);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            throw new RuntimeException();
         }
     }
 
-    private void setSheetId(String message, long chatId) {
+    private void setSheetId(long chatId, String message) {
         String sheetId = message.trim();
 
         if (!SHEET_ID_PATTERN.matcher(sheetId).matches()) {
@@ -113,17 +85,50 @@ public class TelegramBot extends TelegramLongPollingBot {
         sendMessage(chatId, "✅ Sheet ID сохранён!");
     }
 
-    private void sendGifWithText(Long chatId, String gifUrl, String text) {
+    private void sendGifWithText(Long chatId, String gifUrl, String fileName) {
         SendAnimation animation = new SendAnimation();
         animation.setChatId(chatId.toString());
+        animation.setParseMode("HTML");
         animation.setAnimation(new InputFile(gifUrl));
-        animation.setCaption(text);
+
+        String caption = ResourceUtils.readMessage(fileName);
+        animation.setCaption(caption);
 
         try {
             execute(animation);
         } catch (TelegramApiException e) {
             throw new RuntimeException(e);
         }
+    }
+
+
+    public void processAndSaveWords(Long chatId, String messageText) {
+        try {
+            Message loadingMsg = sendMessage(chatId, "Обробляю слова...");
+            Integer messageId = loadingMsg.getMessageId();
+
+            List<WordData> wordsData = chatGPTService.processWords(messageText);
+
+            try {
+                googleSheetsService.writeWords(chatId, wordsData);
+                editMessage(chatId, messageId, "✅ Дані успішно записані в Google Sheets!");
+            } catch (Exception e) {
+                editMessage(chatId, messageId, "⚠️ Помилка при записі в Google Sheets: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private void editMessage(Long chatId, Integer messageId, String newText) throws TelegramApiException {
+        EditMessageText edit = new EditMessageText();
+        edit.setChatId(chatId.toString());
+        edit.setMessageId(messageId);
+        edit.setText(newText);
+        execute(edit);
     }
 
     @Override

@@ -19,6 +19,5 @@ spring:
 google:
   sheets:
     spreadsheet-id:
-    credentials-path: credentials.json
+    credentials-path:
     sheet-name: Words
-
