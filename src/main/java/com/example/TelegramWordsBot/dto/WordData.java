@@ -1,4 +1,4 @@
-package com.example.TelegramWordsBot.model;
+package com.example.TelegramWordsBot.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;

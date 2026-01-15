@@ -1,6 +1,6 @@
 package com.example.TelegramWordsBot.service;
 
-import com.example.TelegramWordsBot.model.WordData;
+import com.example.TelegramWordsBot.dto.WordData;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
@@ -30,7 +30,6 @@ public class ChatGPTService {
         String responseText = chatClient.prompt(prompt).call().content();
 
         try {
-            // Очистка ответа от возможных markdown блоков
             String cleanedResponse = responseText.trim();
             if (cleanedResponse.startsWith("```json")) {
                 cleanedResponse = cleanedResponse.substring(7);

@@ -1,12 +1,28 @@
 server:
   port: 8080
 
+bot:
+  secret_key:
+
 telegram:
   bot:
     token:
-    username:
+    username: English_word_eugene
 
 spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/bot_words
+    username:
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
   main:
     web-application-type: none
   ai:
@@ -19,5 +35,5 @@ spring:
 google:
   sheets:
     spreadsheet-id:
-    credentials-path:
+    credentials-path: credentials.json
     sheet-name: Words

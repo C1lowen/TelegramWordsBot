@@ -1,8 +1,9 @@
 package com.example.TelegramWordsBot.service;
 
-import com.example.TelegramWordsBot.model.WordData;
-import com.example.TelegramWordsBot.repository.InMemoryUserSessionRepository;
+import com.example.TelegramWordsBot.dto.WordData;
+import com.example.TelegramWordsBot.model.User;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.sheets.v4.Sheets;
@@ -28,7 +29,6 @@ public class GoogleSheetsService {
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private static final List<String> SCOPES = Collections.singletonList("https://www.googleapis.com/auth/spreadsheets");
 
-    private final InMemoryUserSessionRepository repository;
     private final String sheetName;
     private final String credentialsPath;
     private final Sheets sheetsService;
@@ -36,11 +36,9 @@ public class GoogleSheetsService {
     public GoogleSheetsService(
             @Value("${google.sheets.sheet-name:Words}") String sheetName,
             @Value("${google.sheets.credentials-path:credentials.json}") String credentialsPath,
-            InMemoryUserSessionRepository repository
-    ) throws GeneralSecurityException, IOException {
+            UserService userService) throws GeneralSecurityException, IOException {
         this.sheetName = sheetName;
         this.credentialsPath = credentialsPath;
-        this.repository = repository;
         this.sheetsService = createSheetsService();
     }
 
@@ -59,11 +57,34 @@ public class GoogleSheetsService {
                 .build();
     }
 
+    public boolean spreadsheetExists(String spreadsheetId) {
+        try {
+            sheetsService.spreadsheets()
+                    .get(spreadsheetId)
+                    .setIncludeGridData(false)
+                    .execute();
+
+            return true;
+
+        } catch (GoogleJsonResponseException e) {
+            int status = e.getStatusCode();
+
+            if (status == 404 || status == 403) {
+                return false;
+            }
+
+            throw new RuntimeException("Ошибка Google Sheets API", e);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Ошибка соединения с Google Sheets", e);
+        }
+    }
+
     /**
      * Записывает слова в Google Sheets и добавляет заголовки, если таблица пустая
      */
-    public void writeWords(long chatId, List<WordData> words) throws IOException {
-        String sheetId = repository.getSheetId(chatId);
+    public void writeWords(List<WordData> words, User user) throws IOException {
+        String sheetId = user.getSheetId();
         String range = sheetName + "!A:C";
 
         ValueRange response = sheetsService.spreadsheets().values()
@@ -93,7 +114,6 @@ public class GoogleSheetsService {
                 ))
                 .toList();
 
-        // Записываем данные
         ValueRange body = new ValueRange().setValues(data);
         String writeRange = sheetName + "!A" + nextRow + ":C" + (nextRow + words.size() - 1);
 
@@ -102,7 +122,6 @@ public class GoogleSheetsService {
                 .setValueInputOption("RAW")
                 .execute();
 
-        // Красим столбцы после записи
         colorColumn(sheetId, 0, new float[]{1f, 0.8f, 0.8f}); // Original → светло-розовый
         colorColumn(sheetId, 1, new float[]{0.8f, 1f, 0.8f}); // Translation → светло-зелёный
         colorColumn(sheetId, 2, new float[]{0.8f, 0.8f, 1f}); // Transcription → светло-голубой
@@ -112,7 +131,7 @@ public class GoogleSheetsService {
     public void colorColumn(String sheetId, int columnIndex, float[] rgbColor) throws IOException {
         if (rgbColor.length != 3) throw new IllegalArgumentException("rgbColor должен содержать 3 значения: {r, g, b}");
 
-        int sheetTabId = 0; // ID листа, по умолчанию первый
+        int sheetTabId = 0;
 
         var color = new Color()
                 .setRed(rgbColor[0])
@@ -126,7 +145,7 @@ public class GoogleSheetsService {
                 .setStartColumnIndex(columnIndex)
                 .setEndColumnIndex(columnIndex + 1)
                 .setStartRowIndex(0)
-                .setEndRowIndex(1000); // можно увеличить, если будет много строк
+                .setEndRowIndex(1000);
 
         var repeatCellRequest = new RepeatCellRequest()
                 .setRange(range)

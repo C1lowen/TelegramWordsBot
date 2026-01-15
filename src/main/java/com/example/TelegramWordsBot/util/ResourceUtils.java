@@ -10,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 public class ResourceUtils {
 
     private static final String BASE_FOLDER = "messages/";
-    private static final String GIF_FOLDER = "gifs/";
 
     public static String readMessage(String fileName) {
         try (InputStream is = ResourceUtils.class.getClassLoader().getResourceAsStream(BASE_FOLDER + fileName)) {
