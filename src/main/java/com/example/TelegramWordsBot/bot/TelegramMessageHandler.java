@@ -77,10 +77,7 @@ public class TelegramMessageHandler {
         if (user.getUserState() == UserState.WAITING_FOR_SHEET_ID) {
             if (!googleSheetsService.spreadsheetExists(text)) {
                 bot.sendMessage(chatId,
-                        "❌ Похоже, это не Sheet ID.\n" +
-                                "Пришли только ID, а не всю ссылку.\n\n" +
-                                "Пример:\n" +
-                                "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms");
+                        "❌ Вы ввели неправильный ID или не дали доступ к таблице");
                 return;
             }
 
@@ -97,24 +94,23 @@ public class TelegramMessageHandler {
     }
 
     private void processAndSaveWords(TelegramBot bot, User user, String messageText) {
-        Long chatId = user.getChatId();
-        Message loadingMsg = bot.sendMessage(chatId, "Обробляю слова...");
-        Integer messageId = loadingMsg.getMessageId();
-
         try {
+            Long chatId = user.getChatId();
+            Message loadingMsg = bot.sendMessage(chatId, "Обробляю слова...");
+            Integer messageId = loadingMsg.getMessageId();
+
             var wordsData = chatGPTService.processWords(messageText);
-            googleSheetsService.writeWords(wordsData, user);
 
-            bot.editMessage(chatId, messageId,
-                    "✅ Дані успішно записані в Google Sheets!");
-
-        } catch (GoogleSheetsWriteException e) {
-            bot.editMessage(chatId, messageId,
-                    "⚠️ Помилка при записі в Google Sheets");
+            try {
+                googleSheetsService.writeWords(wordsData, user);
+                bot.editMessage(chatId, messageId, "✅ Дані успішно записані в Google Sheets!");
+            } catch (Exception e) {
+                bot.editMessage(chatId, messageId,
+                        "⚠️ Помилка при записі в Google Sheets: " + e.getMessage());
+            }
 
         } catch (Exception e) {
-            bot.editMessage(chatId, messageId,
-                    "❌ Сталася несподівана помилка");
+            e.printStackTrace();
         }
     }
 }
