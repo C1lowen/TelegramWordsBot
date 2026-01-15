@@ -8,6 +8,7 @@ import com.example.TelegramWordsBot.service.GoogleSheetsService;
 import com.example.TelegramWordsBot.service.UserService;
 import com.example.TelegramWordsBot.util.ResourceUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendAnimation;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -22,6 +23,11 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class TelegramMessageHandler {
+
+    @Value(value = "${media.gif.start}")
+    private String accessRightsGif;
+    @Value(value = "${media.gif.sheet-id}")
+    private String sheetIdGif;
 
     private final UserService userService;
     private final GoogleSheetsService googleSheetsService;
@@ -51,7 +57,7 @@ public class TelegramMessageHandler {
             bot.sendMessage(chatId, "✅ Авторизация успешна");
             bot.sendGifWithText(
                     chatId,
-                    "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif",
+                    accessRightsGif,
                     "start_message.html"
             );
             return;
@@ -68,7 +74,7 @@ public class TelegramMessageHandler {
             userService.setState(chatId, UserState.WAITING_FOR_SHEET_ID);
             bot.sendGifWithText(
                     chatId,
-                    "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif",
+                    sheetIdGif,
                     "sheet_id_message.html"
             );
             return;

@@ -4,6 +4,11 @@ server:
 bot:
   secret_key:
 
+media:
+  gif:
+    start: https://gift-bucket-telegram.s3.eu-north-1.amazonaws.com/email2.mp4
+    sheet-id: https://gift-bucket-telegram.s3.eu-north-1.amazonaws.com/link2.mp4
+
 telegram:
   bot:
     token:
