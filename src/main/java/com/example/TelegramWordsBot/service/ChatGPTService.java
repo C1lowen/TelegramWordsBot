@@ -1,8 +1,11 @@
 package com.example.TelegramWordsBot.service;
 
 import com.example.TelegramWordsBot.dto.WordData;
+import com.example.TelegramWordsBot.exception.ChatGPTProcessingException;
+import com.example.TelegramWordsBot.util.ResourceUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public class ChatGPTService {
 
@@ -23,13 +27,15 @@ public class ChatGPTService {
     }
 
     public List<WordData> processWords(String wordsList) {
-        String prompt = 
-            "Для каждого английского слова из следующего списка создай JSON объект с полями: original (оригинальное слово), translation (перевод на украинский язык), transcription (транскрипция). " +
-            "Верни только валидный JSON массив объектов без дополнительного текста. Список слов: " + wordsList;
+        log.debug("Processing words list: {}", wordsList);
 
-        String responseText = chatClient.prompt(prompt).call().content();
+        String template = ResourceUtils.readMessage("promt_GPT");
+        String prompt = String.format(template, wordsList);
 
         try {
+            String responseText = chatClient.prompt(prompt).call().content();
+            log.debug("Received response from ChatGPT");
+
             String cleanedResponse = responseText.trim();
             if (cleanedResponse.startsWith("```json")) {
                 cleanedResponse = cleanedResponse.substring(7);
@@ -42,9 +48,15 @@ public class ChatGPTService {
             }
             cleanedResponse = cleanedResponse.trim();
 
-            return objectMapper.readValue(cleanedResponse, new TypeReference<List<WordData>>() {});
+            List<WordData> result = objectMapper.readValue(cleanedResponse, new TypeReference<List<WordData>>() {});
+            log.info("Successfully processed {} words", result.size());
+            return result;
+            
+        } catch (ChatGPTProcessingException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Ошибка при парсинге ответа от ChatGPT: " + e.getMessage(), e);
+            log.error("Error parsing ChatGPT response", e);
+            throw new ChatGPTProcessingException("Failed to parse ChatGPT response: " + e.getMessage(), e);
         }
     }
 }

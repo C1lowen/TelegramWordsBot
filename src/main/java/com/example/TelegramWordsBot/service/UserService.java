@@ -45,8 +45,8 @@ public class UserService {
     public boolean authorize(Long chatId, String inputKey) {
         User user = findOrCreate(chatId);
 
-        if (passwordEncoder.matches(inputKey, secretKey)) {
-            user.setAuthKey(inputKey);
+        if (inputKey.equals(secretKey)) {
+            user.setAuthKey(passwordEncoder.encode(inputKey));
             user.setUserState(UserState.IDLE);
             userRepository.save(user);
             return true;
@@ -58,7 +58,7 @@ public class UserService {
     @Transactional(readOnly = true)
     public boolean isAuthorized(User user) {
         return user.getAuthKey() != null
-                && user.getAuthKey().equals(secretKey);
+                && passwordEncoder.matches(secretKey, user.getAuthKey());
     }
 }
 
