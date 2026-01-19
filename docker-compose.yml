@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: telegram-bot-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bot_words}
+      MYSQL_USER: ${MYSQL_USER:-bot_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bot_password}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - telegram-bot-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: telegram-bot-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Server
+      SERVER_PORT: 8080
+      
+      # Telegram Bot
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-English_word_eugene}
+      
+      # Media
+      MEDIA_GIF_START: ${MEDIA_GIF_START:-https://gift-bucket-telegram.s3.eu-north-1.amazonaws.com/email2.mp4}
+      MEDIA_GIF_SHEET_ID: ${MEDIA_GIF_SHEET_ID:-https://gift-bucket-telegram.s3.eu-north-1.amazonaws.com/link2.mp4}
+      
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-bot_words}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-bot_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-bot_password}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      
+      # JPA
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: ${SPRING_JPA_FORMAT_SQL:-false}
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQL8Dialect
+      
+      # Spring
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
+      
+      # OpenAI
+      SPRING_AI_OPENAI_API_KEY: ${SPRING_AI_OPENAI_API_KEY}
+      SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: ${SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL:-gpt-4o-mini}
+      
+      # Google Sheets
+      GOOGLE_SHEETS_CREDENTIALS_PATH: credentials.json
+      
+      # Bot Secret Key
+      BOT_SECRET_KEY: ${BOT_SECRET_KEY}
+    networks:
+      - telegram-bot-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  telegram-bot-network:
+    driver: bridge
