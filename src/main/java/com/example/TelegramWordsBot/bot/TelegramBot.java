@@ -81,7 +81,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         String caption = ResourceUtils.readMessage(fileName);
         animation.setCaption(caption);
-
         try {
             execute(animation);
             log.debug("GIF sent successfully to chatId={}", chatId);
